@@ -1,465 +1,311 @@
-import { useState, useMemo } from "react";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeadsCon '26 Vegas Tracker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+</head>
+<body style="margin:0;padding:0;">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
 
-const BUCKETS = [
-  { id: "A", label: "A", desc: ">$50/lead", color: "#16a34a", bg: "#f0fdf4", border: "#86efac" },
-  { id: "B", label: "B", desc: "$20–$50/lead", color: "#1d6fce", bg: "#eff6ff", border: "#93c5fd" },
-  { id: "C", label: "C", desc: "$5–$20/lead", color: "#b45309", bg: "#fffbeb", border: "#fcd34d" },
-  { id: "D", label: "D", desc: "$1–$5/lead", color: "#dc2626", bg: "#fef2f2", border: "#fca5a5" },
-  { id: "F", label: "F", desc: "<$1 raw (no opt-in)", color: "#7c3aed", bg: "#faf5ff", border: "#c4b5fd" },
-  { id: "AGED", label: "AGED", desc: "Aged opt-in (any tier)", color: "#c2410c", bg: "#fff7ed", border: "#fdba74" },
-];
+    const BUCKETS = [
+      { id: "A",    label: "A",    desc: ">$50/lead",            color: "#16a34a", bg: "#f0fdf4", border: "#86efac" },
+      { id: "B",    label: "B",    desc: "$20-$50/lead",         color: "#1d6fce", bg: "#eff6ff", border: "#93c5fd" },
+      { id: "C",    label: "C",    desc: "$5-$20/lead",          color: "#b45309", bg: "#fffbeb", border: "#fcd34d" },
+      { id: "D",    label: "D",    desc: "$1-$5/lead",           color: "#dc2626", bg: "#fef2f2", border: "#fca5a5" },
+      { id: "F",    label: "F",    desc: "<$1 raw (no opt-in)",  color: "#7c3aed", bg: "#faf5ff", border: "#c4b5fd" },
+      { id: "AGED", label: "AGED", desc: "Aged opt-in (any tier)",color: "#c2410c", bg: "#fff7ed", border: "#fdba74" },
+    ];
 
-const VERTICALS = ["Mortgage", "Home Improvement", "Both", "Other"];
-const EXCLUSIVITY = ["Exclusive", "Shared", "Semi-Exclusive", "Unknown"];
+    const VERTICALS   = ["Mortgage", "Home Improvement", "Both", "Other"];
+    const EXCLUSIVITY = ["Exclusive", "Shared", "Semi-Exclusive", "Unknown"];
 
-const emptyContact = { id: Date.now(), name: "", email: "", phone: "", title: "" };
+    const emptyCompany = {
+      company: "", vertical: "Mortgage", bucket: "A", cpl: "",
+      waysLeadsSold: "", exclusivity: "Unknown", notes: "", contacts: [],
+    };
 
-const emptyCompany = {
-  company: "",
-  vertical: "Mortgage",
-  bucket: "A",
-  cpl: "",
-  waysLeadsSold: "",
-  exclusivity: "Unknown",
-  notes: "",
-  contacts: [{ ...emptyContact }],
-};
+    let uid = 1000;
+    const newId = () => ++uid;
 
-let uid = 1000;
-const newId = () => ++uid;
+    const SAMPLE = [
+      {
+        id: 1, company: "SampleCo Media", vertical: "Mortgage", bucket: "A", cpl: "55",
+        waysLeadsSold: "1", exclusivity: "Exclusive", notes: "Strong mortgage book",
+        contacts: [
+          { id: 10, name: "Jane Doe",  email: "jane@sampleco.com", phone: "555-001-0001", title: "VP Sales" },
+          { id: 11, name: "Ryan Park", email: "ryan@sampleco.com", phone: "555-001-0002", title: "Account Exec" },
+        ],
+      },
+      {
+        id: 2, company: "SocialLeads Pro", vertical: "Both", bucket: "B", cpl: "25",
+        waysLeadsSold: "3", exclusivity: "Shared", notes: "Agg social - sold 3 ways",
+        contacts: [{ id: 20, name: "Mike Torres", email: "mike@slpro.com", phone: "555-002-0002", title: "CEO" }],
+      },
+      {
+        id: 3, company: "AgedData Inc", vertical: "Home Improvement", bucket: "AGED", cpl: "15",
+        waysLeadsSold: "1", exclusivity: "Exclusive", notes: "Aged opt-in, 30-90 days",
+        contacts: [{ id: 30, name: "Sara Kim", email: "sara@ageddata.com", phone: "555-003-0003", title: "Director" }],
+      },
+    ];
 
-const SAMPLE = [
-  {
-    id: 1, company: "SampleCo Media", vertical: "Mortgage", bucket: "A", cpl: "55",
-    waysLeadsSold: "1", exclusivity: "Exclusive", notes: "Strong mortgage book",
-    contacts: [
-      { id: 10, name: "Jane Doe", email: "jane@sampleco.com", phone: "555-001-0001", title: "VP Sales" },
-      { id: 11, name: "Ryan Park", email: "ryan@sampleco.com", phone: "555-001-0002", title: "Account Exec" },
-    ],
-  },
-  {
-    id: 2, company: "SocialLeads Pro", vertical: "Both", bucket: "B", cpl: "25",
-    waysLeadsSold: "3", exclusivity: "Shared", notes: "Agg social — sold 3 ways",
-    contacts: [
-      { id: 20, name: "Mike Torres", email: "mike@slpro.com", phone: "555-002-0002", title: "CEO" },
-    ],
-  },
-  {
-    id: 3, company: "AgedData Inc", vertical: "Home Improvement", bucket: "AGED", cpl: "15",
-    waysLeadsSold: "1", exclusivity: "Exclusive", notes: "Aged opt-in, 30–90 days",
-    contacts: [
-      { id: 30, name: "Sara Kim", email: "sara@ageddata.com", phone: "555-003-0003", title: "Director" },
-    ],
-  },
-];
+    function App() {
+      const [companies,      setCompanies]      = useState(SAMPLE);
+      const [expandedId,     setExpandedId]     = useState(null);
+      const [editingId,      setEditingId]      = useState(null);
+      const [showForm,       setShowForm]       = useState(false);
+      const [form,           setForm]           = useState(emptyCompany);
+      const [search,         setSearch]         = useState("");
+      const [filterBucket,   setFilterBucket]   = useState("ALL");
+      const [filterVertical, setFilterVertical] = useState("ALL");
+      const [confirmDeleteId,setConfirmDeleteId]= useState(null);
 
-export default function LeadsConTracker() {
-  const [companies, setCompanies] = useState(SAMPLE);
-  const [expandedId, setExpandedId] = useState(null);
-  const [editingId, setEditingId] = useState(null); // company id being edited
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyCompany);
-  const [search, setSearch] = useState("");
-  const [filterBucket, setFilterBucket] = useState("ALL");
-  const [filterVertical, setFilterVertical] = useState("ALL");
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+      const getBkt = (id) => BUCKETS.find((b) => b.id === id) || BUCKETS[0];
 
-  const getBkt = (id) => BUCKETS.find((b) => b.id === id) || BUCKETS[0];
+      const vcol = (v) => ({ Mortgage:{"color":"#1d6fce","bg":"#eff6ff"}, "Home Improvement":{"color":"#16a34a","bg":"#f0fdf4"}, Both:{"color":"#b45309","bg":"#fffbeb"}, Other:{"color":"#6b7280","bg":"#f9fafb"} }[v] || {color:"#6b7280",bg:"#f9fafb"});
+      const ecol = (e) => ({ Exclusive:{"color":"#16a34a","bg":"#f0fdf4"}, Shared:{"color":"#dc2626","bg":"#fef2f2"}, "Semi-Exclusive":{"color":"#b45309","bg":"#fffbeb"}, Unknown:{"color":"#9ca3af","bg":"#f9fafb"} }[e] || {color:"#9ca3af",bg:"#f9fafb"});
 
-  const verticalColor = (v) => ({
-    Mortgage: { color: "#1d6fce", bg: "#eff6ff" },
-    "Home Improvement": { color: "#16a34a", bg: "#f0fdf4" },
-    Both: { color: "#b45309", bg: "#fffbeb" },
-    Other: { color: "#6b7280", bg: "#f9fafb" },
-  }[v] || { color: "#6b7280", bg: "#f9fafb" });
+      const openNew = () => {
+        setForm({ ...emptyCompany, contacts: [{ id: newId(), name: "", email: "", phone: "", title: "" }] });
+        setEditingId(null); setShowForm(true);
+        setTimeout(() => document.getElementById("top")?.scrollIntoView({ behavior: "smooth" }), 50);
+      };
+      const openEdit = (co) => {
+        setForm(JSON.parse(JSON.stringify(co)));
+        setEditingId(co.id); setShowForm(true); setExpandedId(null);
+        setTimeout(() => document.getElementById("top")?.scrollIntoView({ behavior: "smooth" }), 50);
+      };
+      const cancelForm = () => { setShowForm(false); setEditingId(null); };
+      const saveForm = () => {
+        if (!form.company.trim()) return;
+        const contacts = form.contacts.filter((c) => c.name.trim() || c.email.trim() || c.phone.trim());
+        const data = { ...form, contacts };
+        if (editingId !== null) {
+          setCompanies(companies.map((c) => c.id === editingId ? { ...data, id: editingId } : c));
+        } else {
+          setCompanies([...companies, { ...data, id: newId() }]);
+        }
+        setShowForm(false); setEditingId(null);
+      };
+      const deleteCompany = (id) => { setCompanies(companies.filter((c) => c.id !== id)); setConfirmDeleteId(null); setExpandedId(null); };
+      const setContact    = (idx, field, val) => setForm({ ...form, contacts: form.contacts.map((c, i) => i === idx ? { ...c, [field]: val } : c) });
+      const addContact    = () => setForm({ ...form, contacts: [...form.contacts, { id: newId(), name: "", email: "", phone: "", title: "" }] });
+      const removeContact = (idx) => setForm({ ...form, contacts: form.contacts.filter((_, i) => i !== idx) });
 
-  const exclColor = (e) => ({
-    Exclusive: { color: "#16a34a", bg: "#f0fdf4" },
-    Shared: { color: "#dc2626", bg: "#fef2f2" },
-    "Semi-Exclusive": { color: "#b45309", bg: "#fffbeb" },
-    Unknown: { color: "#9ca3af", bg: "#f9fafb" },
-  }[e] || { color: "#9ca3af", bg: "#f9fafb" });
+      const filtered = useMemo(() => {
+        let data = [...companies];
+        if (search) { const q = search.toLowerCase(); data = data.filter((co) => co.company?.toLowerCase().includes(q) || co.notes?.toLowerCase().includes(q) || co.contacts?.some((c) => c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q))); }
+        if (filterBucket   !== "ALL") data = data.filter((co) => co.bucket   === filterBucket);
+        if (filterVertical !== "ALL") data = data.filter((co) => co.vertical === filterVertical);
+        return data;
+      }, [companies, search, filterBucket, filterVertical]);
 
-  // --- form helpers ---
-  const openNew = () => {
-    setForm({ ...emptyCompany, contacts: [{ id: newId(), name: "", email: "", phone: "", title: "" }] });
-    setEditingId(null);
-    setShowForm(true);
-    setTimeout(() => document.getElementById("form-anchor")?.scrollIntoView({ behavior: "smooth" }), 50);
-  };
+      const stats = useMemo(() => { const s = {}; BUCKETS.forEach((b) => { s[b.id] = companies.filter((c) => c.bucket === b.id).length; }); return s; }, [companies]);
 
-  const openEdit = (co) => {
-    setForm(JSON.parse(JSON.stringify(co)));
-    setEditingId(co.id);
-    setShowForm(true);
-    setExpandedId(null);
-    setTimeout(() => document.getElementById("form-anchor")?.scrollIntoView({ behavior: "smooth" }), 50);
-  };
+      const inp = { padding:"10px 12px", border:"1.5px solid #e5e7eb", borderRadius:8, fontSize:15, color:"#111827", background:"#fff", fontFamily:"inherit", width:"100%", boxSizing:"border-box" };
+      const lbl = { fontSize:11, fontWeight:600, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5, display:"block" };
 
-  const cancelForm = () => { setShowForm(false); setEditingId(null); };
+      return (
+        <div style={{ minHeight:"100vh", background:"#f1f5f9", fontFamily:"'Inter',system-ui,sans-serif", color:"#111827" }}>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+            *{box-sizing:border-box;margin:0;padding:0;}
+            input,select,textarea{outline:none;}
+            input:focus,select:focus,textarea:focus{border-color:#3b82f6!important;box-shadow:0 0 0 3px rgba(59,130,246,0.12);}
+            input::placeholder,textarea::placeholder{color:#cbd5e1;}
+            a{text-decoration:none;}
+            .bb{transition:all 0.15s;}.bb:active{transform:scale(0.95);}
+            .card{transition:box-shadow 0.15s;}.card:hover{box-shadow:0 3px 12px rgba(0,0,0,0.09)!important;}
+            .tb{transition:opacity 0.12s;cursor:pointer;}.tb:hover{opacity:0.75;}
+          `}</style>
 
-  const saveForm = () => {
-    if (!form.company.trim()) return;
-    const cleanContacts = form.contacts.filter((c) => c.name.trim() || c.email.trim() || c.phone.trim());
-    const data = { ...form, contacts: cleanContacts.length ? cleanContacts : [] };
-    if (editingId !== null) {
-      setCompanies(companies.map((c) => c.id === editingId ? { ...data, id: editingId } : c));
-    } else {
-      setCompanies([...companies, { ...data, id: newId() }]);
-    }
-    setShowForm(false);
-    setEditingId(null);
-  };
-
-  const deleteCompany = (id) => {
-    setCompanies(companies.filter((c) => c.id !== id));
-    setConfirmDeleteId(null);
-    setExpandedId(null);
-  };
-
-  // contact row helpers inside form
-  const setContact = (idx, field, val) => {
-    const contacts = form.contacts.map((c, i) => i === idx ? { ...c, [field]: val } : c);
-    setForm({ ...form, contacts });
-  };
-  const addContact = () => setForm({ ...form, contacts: [...form.contacts, { id: newId(), name: "", email: "", phone: "", title: "" }] });
-  const removeContact = (idx) => setForm({ ...form, contacts: form.contacts.filter((_, i) => i !== idx) });
-
-  // --- filtered list ---
-  const filtered = useMemo(() => {
-    let data = [...companies];
-    if (search) {
-      const q = search.toLowerCase();
-      data = data.filter((co) =>
-        co.company?.toLowerCase().includes(q) ||
-        co.notes?.toLowerCase().includes(q) ||
-        co.contacts?.some((c) => c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q))
-      );
-    }
-    if (filterBucket !== "ALL") data = data.filter((co) => co.bucket === filterBucket);
-    if (filterVertical !== "ALL") data = data.filter((co) => co.vertical === filterVertical);
-    return data;
-  }, [companies, search, filterBucket, filterVertical]);
-
-  const stats = useMemo(() => {
-    const s = {};
-    BUCKETS.forEach((b) => { s[b.id] = companies.filter((c) => c.bucket === b.id).length; });
-    return s;
-  }, [companies]);
-
-  const inp = {
-    padding: "10px 12px", border: "1.5px solid #e5e7eb", borderRadius: 8,
-    fontSize: 15, color: "#111827", background: "#fff", fontFamily: "inherit", width: "100%",
-  };
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Inter', system-ui, sans-serif", color: "#111827" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        input, select, textarea { outline: none; }
-        input:focus, select:focus, textarea:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
-        input::placeholder, textarea::placeholder { color: #cbd5e1; }
-        a { text-decoration: none; }
-        .bkt-btn { transition: all 0.15s; }
-        .bkt-btn:active { transform: scale(0.95); }
-        .card { transition: box-shadow 0.15s; }
-        .card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.09) !important; }
-        .tbtn { transition: opacity 0.12s; cursor: pointer; }
-        .tbtn:hover { opacity: 0.75; }
-      `}</style>
-
-      {/* Sticky Header */}
-      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "13px 16px", position: "sticky", top: 0, zIndex: 50, boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
-        <div style={{ maxWidth: 700, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.3px" }}>
-              LeadsCon <span style={{ color: "#2563eb" }}>'26</span> <span style={{ color: "#94a3b8", fontWeight: 400 }}>Vegas</span>
+          {/* Header */}
+          <div style={{ background:"#fff", borderBottom:"1px solid #e2e8f0", padding:"13px 16px", position:"sticky", top:0, zIndex:50, boxShadow:"0 1px 6px rgba(0,0,0,0.06)" }}>
+            <div style={{ maxWidth:700, margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+              <div>
+                <div style={{ fontSize:18, fontWeight:700, color:"#0f172a", letterSpacing:"-0.3px" }}>
+                  LeadsCon <span style={{ color:"#2563eb" }}>'26</span> <span style={{ color:"#94a3b8", fontWeight:400 }}>Vegas</span>
+                </div>
+                <div style={{ fontSize:11, color:"#94a3b8", marginTop:1 }}>Mortgage &amp; Home Improvement</div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ fontSize:13, color:"#64748b", background:"#f1f5f9", borderRadius:20, padding:"4px 12px", fontWeight:500 }}>
+                  {companies.length} co &middot; {companies.reduce((n,c)=>n+(c.contacts?.length||0),0)} contacts
+                </div>
+                <button onClick={openNew} style={{ background:"#2563eb", border:"none", borderRadius:8, padding:"9px 15px", color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>+ Add</button>
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>Mortgage & Home Improvement</div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ fontSize: 13, color: "#64748b", background: "#f1f5f9", borderRadius: 20, padding: "4px 12px", fontWeight: 500 }}>
-              {companies.length} co · {companies.reduce((n, c) => n + (c.contacts?.length || 0), 0)} contacts
-            </div>
-            <button onClick={openNew}
-              style={{ background: "#2563eb", border: "none", borderRadius: 8, padding: "9px 15px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-              + Add
-            </button>
-          </div>
-        </div>
-      </div>
 
-      <div style={{ maxWidth: 700, margin: "0 auto", padding: "16px 14px" }} id="form-anchor">
+          <div style={{ maxWidth:700, margin:"0 auto", padding:"16px 14px" }} id="top">
 
-        {/* Bucket tiles */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 16 }}>
-          {BUCKETS.map((b) => (
-            <button key={b.id} className="bkt-btn" onClick={() => setFilterBucket(filterBucket === b.id ? "ALL" : b.id)}
-              style={{
-                background: filterBucket === b.id ? b.bg : "#fff",
-                border: `1.5px solid ${filterBucket === b.id ? b.color : "#e2e8f0"}`,
-                borderRadius: 10, padding: "10px 6px", cursor: "pointer", textAlign: "center",
-                fontFamily: "inherit", boxShadow: filterBucket === b.id ? `0 0 0 2px ${b.border}` : "none",
-              }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: b.color, lineHeight: 1 }}>{stats[b.id] || 0}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: b.color, marginTop: 2 }}>{b.label}</div>
-              <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 2, lineHeight: 1.3 }}>{b.desc}</div>
-            </button>
-          ))}
-        </div>
-
-        {/* Add / Edit Company Form */}
-        {showForm && (
-          <div style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 14, padding: "18px 16px", marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: "#0f172a" }}>
-              {editingId !== null ? "✏️ Edit Company" : "➕ New Company"}
+            {/* Bucket tiles */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:16 }}>
+              {BUCKETS.map((b) => (
+                <button key={b.id} className="bb" onClick={() => setFilterBucket(filterBucket===b.id?"ALL":b.id)}
+                  style={{ background:filterBucket===b.id?b.bg:"#fff", border:`1.5px solid ${filterBucket===b.id?b.color:"#e2e8f0"}`, borderRadius:10, padding:"10px 6px", cursor:"pointer", textAlign:"center", fontFamily:"inherit", boxShadow:filterBucket===b.id?`0 0 0 2px ${b.border}`:"none" }}>
+                  <div style={{ fontSize:22, fontWeight:700, color:b.color, lineHeight:1 }}>{stats[b.id]||0}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:b.color, marginTop:2 }}>{b.label}</div>
+                  <div style={{ fontSize:9, color:"#94a3b8", marginTop:2, lineHeight:1.3 }}>{b.desc}</div>
+                </button>
+              ))}
             </div>
 
-            {/* Company fields */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Company Name *</div>
-                <input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Company name" style={inp} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Vertical</div>
-                  <select value={form.vertical} onChange={(e) => setForm({ ...form, vertical: e.target.value })} style={{ ...inp, cursor: "pointer" }}>
-                    {VERTICALS.map((v) => <option key={v}>{v}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Bucket</div>
-                  <select value={form.bucket} onChange={(e) => setForm({ ...form, bucket: e.target.value })} style={{ ...inp, cursor: "pointer" }}>
-                    {BUCKETS.map((b) => <option key={b.id} value={b.id}>{b.id} — {b.desc}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>$ / Lead</div>
-                  <input value={form.cpl} onChange={(e) => setForm({ ...form, cpl: e.target.value })} placeholder="e.g. 25" style={inp} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Ways Sold</div>
-                  <input value={form.waysLeadsSold} onChange={(e) => setForm({ ...form, waysLeadsSold: e.target.value })} placeholder="e.g. 1, 3" style={inp} />
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Exclusivity</div>
-                <select value={form.exclusivity} onChange={(e) => setForm({ ...form, exclusivity: e.target.value })} style={{ ...inp, cursor: "pointer" }}>
-                  {EXCLUSIVITY.map((e) => <option key={e}>{e}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Notes</div>
-                <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Lead quality, follow-up items, context..." rows={2}
-                  style={{ ...inp, resize: "vertical" }} />
-              </div>
-
-              {/* Contacts section */}
-              <div style={{ borderTop: "1.5px solid #f1f5f9", paddingTop: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.06em" }}>Contacts</div>
-                  <button onClick={addContact}
-                    style={{ background: "#eff6ff", border: "1.5px solid #bfdbfe", borderRadius: 7, padding: "5px 12px", color: "#1d6fce", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                    + Add Contact
-                  </button>
-                </div>
-                {form.contacts.map((contact, idx) => (
-                  <div key={contact.id} style={{ background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "12px", marginBottom: 10 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Contact {idx + 1}</div>
-                      {form.contacts.length > 1 && (
-                        <button onClick={() => removeContact(idx)}
-                          style={{ background: "none", border: "none", color: "#dc2626", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}>
-                          ✕ Remove
-                        </button>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <input value={contact.name} onChange={(e) => setContact(idx, "name", e.target.value)}
-                        placeholder="Full name" style={{ ...inp, fontSize: 14 }} />
-                      <input value={contact.title} onChange={(e) => setContact(idx, "title", e.target.value)}
-                        placeholder="Title / role (optional)" style={{ ...inp, fontSize: 14 }} />
-                      <input value={contact.email} onChange={(e) => setContact(idx, "email", e.target.value)}
-                        placeholder="Email" type="email" style={{ ...inp, fontSize: 14 }} />
-                      <input value={contact.phone} onChange={(e) => setContact(idx, "phone", e.target.value)}
-                        placeholder="Phone" type="tel" style={{ ...inp, fontSize: 14 }} />
-                    </div>
+            {/* Form */}
+            {showForm && (
+              <div style={{ background:"#fff", border:"1.5px solid #e2e8f0", borderRadius:14, padding:"18px 16px", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.08)" }}>
+                <div style={{ fontSize:15, fontWeight:700, marginBottom:16, color:"#0f172a" }}>{editingId!==null?"Edit Company":"New Company"}</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                  <div><span style={lbl}>Company Name *</span><input value={form.company} onChange={(e)=>setForm({...form,company:e.target.value})} placeholder="Company name" style={inp}/></div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                    <div><span style={lbl}>Vertical</span><select value={form.vertical} onChange={(e)=>setForm({...form,vertical:e.target.value})} style={{...inp,cursor:"pointer"}}>{VERTICALS.map((v)=><option key={v}>{v}</option>)}</select></div>
+                    <div><span style={lbl}>Bucket</span><select value={form.bucket} onChange={(e)=>setForm({...form,bucket:e.target.value})} style={{...inp,cursor:"pointer"}}>{BUCKETS.map((b)=><option key={b.id} value={b.id}>{b.id} - {b.desc}</option>)}</select></div>
+                    <div><span style={lbl}>$ / Lead</span><input value={form.cpl} onChange={(e)=>setForm({...form,cpl:e.target.value})} placeholder="e.g. 25" style={inp}/></div>
+                    <div><span style={lbl}>Ways Sold</span><input value={form.waysLeadsSold} onChange={(e)=>setForm({...form,waysLeadsSold:e.target.value})} placeholder="e.g. 1, 3" style={inp}/></div>
                   </div>
-                ))}
+                  <div><span style={lbl}>Exclusivity</span><select value={form.exclusivity} onChange={(e)=>setForm({...form,exclusivity:e.target.value})} style={{...inp,cursor:"pointer"}}>{EXCLUSIVITY.map((ex)=><option key={ex}>{ex}</option>)}</select></div>
+                  <div><span style={lbl}>Notes</span><textarea value={form.notes} onChange={(e)=>setForm({...form,notes:e.target.value})} placeholder="Lead quality, follow-up items, context..." rows={2} style={{...inp,resize:"vertical"}}/></div>
+
+                  <div style={{ borderTop:"1.5px solid #f1f5f9", paddingTop:14 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#0f172a", textTransform:"uppercase", letterSpacing:"0.06em" }}>Contacts</span>
+                      <button onClick={addContact} style={{ background:"#eff6ff", border:"1.5px solid #bfdbfe", borderRadius:7, padding:"5px 12px", color:"#1d6fce", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>+ Add Contact</button>
+                    </div>
+                    {form.contacts.map((contact, idx) => (
+                      <div key={contact.id} style={{ background:"#f8fafc", border:"1.5px solid #e2e8f0", borderRadius:10, padding:12, marginBottom:10 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                          <span style={{ fontSize:12, fontWeight:600, color:"#64748b" }}>Contact {idx+1}</span>
+                          {form.contacts.length > 1 && <button onClick={()=>removeContact(idx)} style={{ background:"none", border:"none", color:"#dc2626", fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>Remove</button>}
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                          <input value={contact.name}  onChange={(e)=>setContact(idx,"name",e.target.value)}  placeholder="Full name"              style={{...inp,fontSize:14}}/>
+                          <input value={contact.title} onChange={(e)=>setContact(idx,"title",e.target.value)} placeholder="Title / role (optional)" style={{...inp,fontSize:14}}/>
+                          <input value={contact.email} onChange={(e)=>setContact(idx,"email",e.target.value)} placeholder="Email" type="email"      style={{...inp,fontSize:14}}/>
+                          <input value={contact.phone} onChange={(e)=>setContact(idx,"phone",e.target.value)} placeholder="Phone" type="tel"        style={{...inp,fontSize:14}}/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display:"flex", gap:10, marginTop:16 }}>
+                  <button onClick={saveForm}   style={{ flex:1, background:"#16a34a", border:"none", borderRadius:9, padding:12, color:"#fff", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>{editingId!==null?"Save Changes":"Add Company"}</button>
+                  <button onClick={cancelForm} style={{ background:"#f1f5f9", border:"1.5px solid #e2e8f0", borderRadius:9, padding:"12px 18px", color:"#64748b", fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+                </div>
               </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              <button onClick={saveForm} style={{ flex: 1, background: "#16a34a", border: "none", borderRadius: 9, padding: "12px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                {editingId !== null ? "Save Changes" : "Add Company"}
-              </button>
-              <button onClick={cancelForm} style={{ background: "#f1f5f9", border: "1.5px solid #e2e8f0", borderRadius: 9, padding: "12px 18px", color: "#64748b", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Search & Filters */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍  Search company, contact, notes..."
-            style={{ ...inp, fontSize: 14 }} />
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            {["ALL", ...VERTICALS].map((v) => (
-              <button key={v} onClick={() => setFilterVertical(v)} style={{
-                background: filterVertical === v ? "#2563eb" : "#fff",
-                border: `1.5px solid ${filterVertical === v ? "#2563eb" : "#e2e8f0"}`,
-                borderRadius: 20, padding: "5px 12px", color: filterVertical === v ? "#fff" : "#64748b",
-                fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-              }}>{v}</button>
-            ))}
-            {(filterBucket !== "ALL" || filterVertical !== "ALL" || search) && (
-              <button onClick={() => { setSearch(""); setFilterBucket("ALL"); setFilterVertical("ALL"); }}
-                style={{ background: "none", border: "none", color: "#ef4444", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
-                ✕ Clear
-              </button>
             )}
-            <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>{filtered.length} compan{filtered.length !== 1 ? "ies" : "y"}</span>
-          </div>
-        </div>
 
-        {/* Company Cards */}
-        {filtered.length === 0 && (
-          <div style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8", fontSize: 14, background: "#fff", borderRadius: 12, border: "1.5px solid #e2e8f0" }}>
-            No companies yet — tap <strong style={{ color: "#2563eb" }}>+ Add</strong> to get started
-          </div>
-        )}
+            {/* Search & Filters */}
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:14 }}>
+              <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search company, contact, notes..." style={{...inp,fontSize:14}}/>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", alignItems:"center" }}>
+                {["ALL",...VERTICALS].map((v)=>(
+                  <button key={v} onClick={()=>setFilterVertical(v)} style={{ background:filterVertical===v?"#2563eb":"#fff", border:`1.5px solid ${filterVertical===v?"#2563eb":"#e2e8f0"}`, borderRadius:20, padding:"5px 12px", color:filterVertical===v?"#fff":"#64748b", fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:"inherit" }}>{v}</button>
+                ))}
+                {(filterBucket!=="ALL"||filterVertical!=="ALL"||search) && (
+                  <button onClick={()=>{setSearch("");setFilterBucket("ALL");setFilterVertical("ALL");}} style={{ background:"none", border:"none", color:"#ef4444", fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:500 }}>Clear</button>
+                )}
+                <span style={{ marginLeft:"auto", fontSize:12, color:"#94a3b8" }}>{filtered.length} {filtered.length!==1?"companies":"company"}</span>
+              </div>
+            </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {filtered.map((co) => {
-            const bkt = getBkt(co.bucket);
-            const vc = verticalColor(co.vertical);
-            const ec = exclColor(co.exclusivity);
-            const isOpen = expandedId === co.id;
-            const contactCount = co.contacts?.length || 0;
-
-            return (
-              <div key={co.id} className="card" style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-
-                {/* Summary Row */}
-                <div onClick={() => { setExpandedId(isOpen ? null : co.id); setConfirmDeleteId(null); }}
-                  style={{ padding: "13px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, userSelect: "none" }}>
-                  <div style={{
-                    minWidth: 40, height: 40, borderRadius: 9, background: bkt.bg, border: `1.5px solid ${bkt.border}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontWeight: 800, fontSize: 13, color: bkt.color, flexShrink: 0,
-                  }}>{co.bucket}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{co.company}</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 2, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      <span style={{ color: vc.color, fontWeight: 500 }}>{co.vertical}</span>
-                      <span style={{ color: "#e2e8f0" }}>·</span>
-                      <span>{contactCount} contact{contactCount !== 1 ? "s" : ""}</span>
+            {/* Cards */}
+            {filtered.length===0 && (
+              <div style={{ textAlign:"center", padding:"48px 20px", color:"#94a3b8", fontSize:14, background:"#fff", borderRadius:12, border:"1.5px solid #e2e8f0" }}>
+                No companies yet - tap <strong style={{ color:"#2563eb" }}>+ Add</strong> to get started
+              </div>
+            )}
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {filtered.map((co) => {
+                const bkt = getBkt(co.bucket);
+                const vc  = vcol(co.vertical);
+                const ec  = ecol(co.exclusivity);
+                const isOpen = expandedId === co.id;
+                const cc = co.contacts?.length || 0;
+                return (
+                  <div key={co.id} className="card" style={{ background:"#fff", border:"1.5px solid #e2e8f0", borderRadius:12, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+                    <div onClick={()=>{setExpandedId(isOpen?null:co.id);setConfirmDeleteId(null);}} style={{ padding:"13px 14px", cursor:"pointer", display:"flex", alignItems:"center", gap:12, userSelect:"none" }}>
+                      <div style={{ minWidth:40, height:40, borderRadius:9, background:bkt.bg, border:`1.5px solid ${bkt.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:13, color:bkt.color, flexShrink:0 }}>{co.bucket}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:600, fontSize:15, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{co.company}</div>
+                        <div style={{ fontSize:12, color:"#64748b", marginTop:2, display:"flex", alignItems:"center", gap:6 }}>
+                          <span style={{ color:vc.color, fontWeight:500 }}>{co.vertical}</span>
+                          <span style={{ color:"#e2e8f0" }}>·</span>
+                          <span>{cc} contact{cc!==1?"s":""}</span>
+                        </div>
+                      </div>
+                      <div style={{ flexShrink:0, textAlign:"right" }}>
+                        {co.cpl && <div style={{ fontWeight:700, fontSize:16, color:"#0f172a" }}>${co.cpl}</div>}
+                        <div style={{ fontSize:11, color:"#94a3b8", marginTop:3 }}>{isOpen?"▲":"▼"}</div>
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ flexShrink: 0, textAlign: "right" }}>
-                    {co.cpl && <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>${co.cpl}</div>}
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{isOpen ? "▲" : "▼"}</div>
-                  </div>
-                </div>
-
-                {/* Expanded */}
-                {isOpen && (
-                  <div style={{ borderTop: "1px solid #f1f5f9", background: "#fafbfc" }}>
-
-                    {/* Deal info chips */}
-                    <div style={{ padding: "12px 14px 0", display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 20, background: bkt.bg, color: bkt.color, border: `1px solid ${bkt.border}`, fontWeight: 600 }}>Bucket {co.bucket}</span>
-                      <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 20, background: ec.bg, color: ec.color, fontWeight: 500 }}>{co.exclusivity}</span>
-                      {co.waysLeadsSold && <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 20, background: "#f1f5f9", color: "#374151", fontWeight: 500 }}>Sold {co.waysLeadsSold}×</span>}
-                      {co.cpl && <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 20, background: "#f1f5f9", color: "#374151", fontWeight: 600 }}>${co.cpl}/lead</span>}
-                    </div>
-
-                    {/* Notes */}
-                    {co.notes && (
-                      <div style={{ margin: "10px 14px 0", fontSize: 13, color: "#374151", padding: "9px 11px", background: "#fff", borderRadius: 7, border: "1px solid #e2e8f0", lineHeight: 1.5 }}>
-                        {co.notes}
+                    {isOpen && (
+                      <div style={{ borderTop:"1px solid #f1f5f9", background:"#fafbfc" }}>
+                        <div style={{ padding:"12px 14px 0", display:"flex", gap:6, flexWrap:"wrap" }}>
+                          <span style={{ fontSize:11, padding:"4px 10px", borderRadius:20, background:bkt.bg, color:bkt.color, border:`1px solid ${bkt.border}`, fontWeight:600 }}>Bucket {co.bucket}</span>
+                          <span style={{ fontSize:11, padding:"4px 10px", borderRadius:20, background:ec.bg, color:ec.color, fontWeight:500 }}>{co.exclusivity}</span>
+                          {co.waysLeadsSold && <span style={{ fontSize:11, padding:"4px 10px", borderRadius:20, background:"#f1f5f9", color:"#374151", fontWeight:500 }}>Sold {co.waysLeadsSold}x</span>}
+                          {co.cpl && <span style={{ fontSize:11, padding:"4px 10px", borderRadius:20, background:"#f1f5f9", color:"#374151", fontWeight:600 }}>${co.cpl}/lead</span>}
+                        </div>
+                        {co.notes && <div style={{ margin:"10px 14px 0", fontSize:13, color:"#374151", padding:"9px 11px", background:"#fff", borderRadius:7, border:"1px solid #e2e8f0", lineHeight:1.5 }}>{co.notes}</div>}
+                        <div style={{ padding:"12px 14px" }}>
+                          <div style={{ fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:8 }}>Contacts ({cc})</div>
+                          {cc===0 && <div style={{ fontSize:13, color:"#cbd5e1", fontStyle:"italic" }}>No contacts added</div>}
+                          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                            {co.contacts?.map((c) => (
+                              <div key={c.id} style={{ background:"#fff", border:"1.5px solid #e2e8f0", borderRadius:9, padding:"10px 12px" }}>
+                                <div style={{ fontWeight:600, fontSize:14, color:"#0f172a" }}>{c.name||<em style={{ color:"#cbd5e1", fontWeight:400 }}>Unnamed</em>}</div>
+                                {c.title && <div style={{ fontSize:12, color:"#64748b", marginTop:1 }}>{c.title}</div>}
+                                <div style={{ display:"flex", flexDirection:"column", gap:4, marginTop:6 }}>
+                                  {c.email && <a href={`mailto:${c.email}`} style={{ fontSize:13, color:"#2563eb", display:"flex", alignItems:"center", gap:5 }}>&#9993; {c.email}</a>}
+                                  {c.phone && <a href={`tel:${c.phone}`}   style={{ fontSize:13, color:"#374151", display:"flex", alignItems:"center", gap:5 }}>&#128222; {c.phone}</a>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{ padding:"0 14px 14px" }}>
+                          {confirmDeleteId===co.id ? (
+                            <div style={{ background:"#fef2f2", border:"1.5px solid #fecaca", borderRadius:8, padding:"10px 12px" }}>
+                              <div style={{ fontSize:13, color:"#dc2626", fontWeight:500, marginBottom:8 }}>Remove {co.company}?</div>
+                              <div style={{ display:"flex", gap:8 }}>
+                                <button onClick={()=>deleteCompany(co.id)} style={{ flex:1, background:"#dc2626", border:"none", borderRadius:7, padding:9, color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Yes, Remove</button>
+                                <button onClick={()=>setConfirmDeleteId(null)} style={{ flex:1, background:"#fff", border:"1.5px solid #e2e8f0", borderRadius:7, padding:9, color:"#64748b", fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display:"flex", gap:8 }}>
+                              <button className="tb" onClick={()=>openEdit(co)} style={{ flex:1, background:"#eff6ff", border:"1.5px solid #bfdbfe", borderRadius:8, padding:10, color:"#1d6fce", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Edit</button>
+                              <button className="tb" onClick={()=>setConfirmDeleteId(co.id)} style={{ flex:1, background:"#fef2f2", border:"1.5px solid #fecaca", borderRadius:8, padding:10, color:"#dc2626", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Delete</button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
-
-                    {/* Contacts list */}
-                    <div style={{ padding: "12px 14px" }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
-                        Contacts ({contactCount})
-                      </div>
-                      {contactCount === 0 && (
-                        <div style={{ fontSize: 13, color: "#cbd5e1", fontStyle: "italic" }}>No contacts added</div>
-                      )}
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {co.contacts?.map((c) => (
-                          <div key={c.id} style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 9, padding: "10px 12px" }}>
-                            <div style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>{c.name || <em style={{ color: "#cbd5e1", fontWeight: 400 }}>Unnamed</em>}</div>
-                            {c.title && <div style={{ fontSize: 12, color: "#64748b", marginTop: 1 }}>{c.title}</div>}
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
-                              {c.email && (
-                                <a href={`mailto:${c.email}`} style={{ fontSize: 13, color: "#2563eb", display: "flex", alignItems: "center", gap: 5 }}>
-                                  <span>✉️</span>{c.email}
-                                </a>
-                              )}
-                              {c.phone && (
-                                <a href={`tel:${c.phone}`} style={{ fontSize: 13, color: "#374151", display: "flex", alignItems: "center", gap: 5 }}>
-                                  <span>📞</span>{c.phone}
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div style={{ padding: "0 14px 14px" }}>
-                      {confirmDeleteId === co.id ? (
-                        <div style={{ background: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: 8, padding: "10px 12px" }}>
-                          <div style={{ fontSize: 13, color: "#dc2626", fontWeight: 500, marginBottom: 8 }}>Remove {co.company}?</div>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => deleteCompany(co.id)} style={{ flex: 1, background: "#dc2626", border: "none", borderRadius: 7, padding: "9px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                              Yes, Remove
-                            </button>
-                            <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 7, padding: "9px", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button className="tbtn" onClick={() => openEdit(co)} style={{ flex: 1, background: "#eff6ff", border: "1.5px solid #bfdbfe", borderRadius: 8, padding: "10px", color: "#1d6fce", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                            ✏️ Edit
-                          </button>
-                          <button className="tbtn" onClick={() => setConfirmDeleteId(co.id)} style={{ flex: 1, background: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: 8, padding: "10px", color: "#dc2626", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                            🗑 Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        <div style={{ marginTop: 18, display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {BUCKETS.map((b) => (
-            <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: b.color, display: "inline-block", flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                <span style={{ color: b.color, fontWeight: 600 }}>{b.label}</span> — {b.desc}
-              </span>
+                );
+              })}
             </div>
-          ))}
+
+            {/* Legend */}
+            <div style={{ marginTop:18, display:"flex", gap:12, flexWrap:"wrap", paddingBottom:24 }}>
+              {BUCKETS.map((b) => (
+                <div key={b.id} style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <span style={{ width:8, height:8, borderRadius:"50%", background:b.color, display:"inline-block", flexShrink:0 }}/>
+                  <span style={{ fontSize:11, color:"#94a3b8" }}><span style={{ color:b.color, fontWeight:600 }}>{b.label}</span> - {b.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+</body>
+</html>
